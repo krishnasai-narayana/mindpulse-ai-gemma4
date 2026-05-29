@@ -113,5 +113,4 @@ ollama run gemma4:e4b
 ---
 
 ## Author
-
-Built for the Gemma 4 Buildathon.
+Krishna Sai Narayana has built it for the Gemma 4 Buildathon.
