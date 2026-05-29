@@ -1,0 +1,7 @@
+Classify risk:
+
+LOW
+MEDIUM
+HIGH
+
+Return only one value.

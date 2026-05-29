@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+
+venv/
+.env
+
+wellness_report.pdf
+
+.streamlit/
+
+.DS_Store
+Thumbs.db
