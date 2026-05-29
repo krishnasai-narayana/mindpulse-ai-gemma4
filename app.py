@@ -1,9 +1,10 @@
 import streamlit as st
 import re
-from utils.storage import save_assessment
-from utils.report_generator import generate_report
+import pandas as pd
 
 from services.gemma_service import ask_gemma
+from utils.storage import save_assessment
+from utils.report_generator import generate_report
 
 st.set_page_config(
     page_title="MindPulse AI",
@@ -11,7 +12,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# -----------------------------
 # Header
+# -----------------------------
+
 st.title("🧠 MindPulse AI")
 
 st.info(
@@ -20,19 +24,25 @@ st.info(
 
 st.subheader("Mental Wellness Assistant powered by Gemma 4")
 
+# -----------------------------
 # Sidebar
+# -----------------------------
+
 with st.sidebar:
+
     st.header("Features")
 
     st.success("Stress Detection")
     st.success("Anxiety Assessment")
     st.success("Burnout Analysis")
+    st.success("Mood Consistency Check")
+    st.success("Wellness Report Download")
     st.success("Privacy First")
 
     st.markdown("---")
 
     st.write(
-        "Powered by Gemma 4 running locally via Ollama."
+        "Powered by Gemma 4 running locally through Ollama."
     )
 
     st.markdown("---")
@@ -41,7 +51,10 @@ with st.sidebar:
         "🔒 Privacy First\n\nYour data never leaves your machine."
     )
 
-# Mood Selector
+# -----------------------------
+# Inputs
+# -----------------------------
+
 mood = st.selectbox(
     "Select your current mood",
     [
@@ -53,20 +66,23 @@ mood = st.selectbox(
     ]
 )
 
-# User Input
 user_input = st.text_area(
     "How are you feeling today?",
     height=150
 )
 
-# Analyze Button
+# -----------------------------
+# Analyze
+# -----------------------------
+
 if st.button("Analyze"):
+
+    st.session_state.saved = False
 
     if not user_input.strip():
         st.warning("Please enter your thoughts.")
         st.stop()
 
-    # Simple safety guardrail
     danger_keywords = [
         "suicide",
         "kill myself",
@@ -77,9 +93,11 @@ if st.button("Analyze"):
     ]
 
     if any(word in user_input.lower() for word in danger_keywords):
+
         st.error(
             "⚠️ Please contact a trusted person, family member, or mental health professional immediately."
         )
+
         st.stop()
 
     with st.spinner("Analyzing with Gemma..."):
@@ -121,9 +139,24 @@ Keep the response concise.
 
     st.success("Analysis Complete")
 
-    stress = re.search(r"Stress Score:\s*(\d+\/10)", result)
-    anxiety = re.search(r"Anxiety Score:\s*(\d+\/10)", result)
-    burnout = re.search(r"Burnout Score:\s*(\d+\/10)", result)
+    stress = re.search(
+        r"Stress Score:\s*(\d+\/10)",
+        result
+    )
+
+    anxiety = re.search(
+        r"Anxiety Score:\s*(\d+\/10)",
+        result
+    )
+
+    burnout = re.search(
+        r"Burnout Score:\s*(\d+\/10)",
+        result
+    )
+
+    # -----------------------------
+    # Metrics + Save Assessment
+    # -----------------------------
 
     if stress and anxiety and burnout:
 
@@ -131,37 +164,104 @@ Keep the response concise.
         anxiety_score = anxiety.group(1).replace("/10", "")
         burnout_score = burnout.group(1).replace("/10", "")
 
-        # Save to CSV
-        save_assessment(
-            mood,
-            stress_score,
-            anxiety_score,
-            burnout_score
-        )
+        if not st.session_state.saved:
+
+            save_assessment(
+                mood,
+                stress_score,
+                anxiety_score,
+                burnout_score
+            )
+
+            st.session_state.saved = True
 
         col1, col2, col3 = st.columns(3)
 
-        col1.metric("Stress", stress.group(1))
-        col2.metric("Anxiety", anxiety.group(1))
-        col3.metric("Burnout", burnout.group(1))
+        col1.metric(
+            "Stress",
+            stress.group(1)
+        )
+
+        col2.metric(
+            "Anxiety",
+            anxiety.group(1)
+        )
+
+        col3.metric(
+            "Burnout",
+            burnout.group(1)
+        )
+
+    # -----------------------------
+    # Analysis Result
+    # -----------------------------
+
+    st.divider()
+
+    st.write(
+        f"**Selected Mood:** {mood}"
+    )
+
+    st.markdown(result)
+
+    # -----------------------------
+    # PDF Download
+    # -----------------------------
+
+    pdf_file = generate_report(
+        mood,
+        result
+    )
+
+    with open(pdf_file, "rb") as file:
+
+        st.download_button(
+            label="📄 Download Wellness Report",
+            data=file,
+            file_name="MindPulse_Report.pdf",
+            mime="application/pdf"
+        )
+
+# -----------------------------
+# Trends Section
+# -----------------------------
+
+try:
+
+    df = pd.read_csv(
+        "data/assessments.csv"
+    )
+
+    if not df.empty:
 
         st.divider()
 
-        st.write(f"**Selected Mood:** {mood}")
-
-        st.markdown(result)
-
-        # Generate PDF
-        pdf_file = generate_report(
-            mood,
-            result
+        st.subheader(
+            "📈 Wellness Trends"
         )
 
-        with open(pdf_file, "rb") as file:
+        chart_df = df.tail(10)
 
-            st.download_button(
-                label="📄 Download Wellness Report",
-                data=file,
-                file_name="MindPulse_Report.pdf",
-                mime="application/pdf"
-            )
+        st.line_chart(
+            chart_df.set_index(
+                "timestamp"
+            )[
+                [
+                    "stress",
+                    "anxiety",
+                    "burnout"
+                ]
+            ]
+        )
+
+        st.subheader(
+            "📋 Assessment History"
+        )
+
+        st.dataframe(
+            chart_df,
+            use_container_width=True
+        )
+
+except Exception:
+    pass
